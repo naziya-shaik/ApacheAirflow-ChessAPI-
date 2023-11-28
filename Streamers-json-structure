@@ -1,0 +1,10 @@
+{
+   "streamers":[
+      {
+         "username": "string",
+         "avatar": "URL",
+         "twitch_url": "Twitch.tv URL",
+         "url":"member url's"
+      }
+    ]
+  }
