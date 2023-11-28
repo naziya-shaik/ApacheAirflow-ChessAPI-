@@ -3,7 +3,9 @@
 **Description:**
 
 This project aims to extract data from chess.com APIs with a python script. The data is then sent to a Data Lake in the form of three json files. 
+
 As soon as the data is loaded into the Data Lake, it is ingested into an SQS Queue and then sent to a Snowflake Data Warehouse via a Snowpipe Pipeline. 
+
 Finally, the data is analysed with SQL queries in the Snowflake tables. The execution of the script is orchestrated by Airflow to operate every day midnight.
 
 **Purpose:**
@@ -16,11 +18,15 @@ Building an end-to-end Data pipeline to collect useful information about streame
 **Python script:**
 
 The python script first sends a request to the "streamers" API to get a list of all streamers on the platform. 
-Then for each streamer the script sends a request for its general information and the statistics of these parts
+
+Then for each streamer the script sends a request for its general information and the statistics of these parts.
 
 The three api's which are used in this project are:
+
 https://api.chess.com/pub/streamers -> This api provides information Chess.com streamers.
+
 https://api.chess.com/pub/player/{username} -> This api provides  additional details about a player in a game.
+
 https://api.chess.com/pub/player/{username}/stats  -> This api provides information about  ratings, win/loss, and other stats about a player's game play,etc
 
 
