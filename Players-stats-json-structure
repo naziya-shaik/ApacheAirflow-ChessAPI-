@@ -1,0 +1,41 @@
+{
+  "chess_daily": {
+    /* stats object for games of rules "chess" and "daily" time-class */
+  },
+  "chess960_daily": {
+    /* stats object for games of rules "chess960" and "daily" time-class */
+  },
+  "chess_blitz": {
+    /* stats object for games of rules "chess" and "blitz" time-class */
+  },
+  "tactics": {
+      "highest": {
+          "rating": "integer",
+          "date": "timestamp"
+      },
+      "lowest": {
+          "rating": "integer",
+          "date": "timestamp"
+      }
+  },
+  "lessons":{
+      "highest": {
+          "rating": "integer",
+          "date": "timestamp"
+      },
+      "lowest": {
+          "rating": "integer",
+          "date": "timestamp"
+      }
+  },
+  "puzzle_rush": {
+      "daily":{ 
+          "total_attempts": "integer",
+          "score": "integer"
+       },
+      "best": {
+          "total_attempts": "integer",
+          "score": "integer"
+       }
+   }
+}
