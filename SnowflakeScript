@@ -1,0 +1,182 @@
+create database chess;
+
+CREATE OR REPLACE TABLE streamers(
+ username string,
+ is_live string
+);
+
+# Creating the streamers_raw_tbl where where the raw data will come and sit directly from the snowpipe.
+create or replace table streamers_raw_tbl(
+  streamers_json variant
+);
+
+# Creating a storage integration between snowflake and AWS through which data can be loaded from the S3 bucket into snowflake table via external stage
+create or replace storage integration s3_integration_json
+    type = external_stage
+    storage_provider = s3
+    enabled = true
+    storage_aws_role_arn = '<role-arn>'
+    storage_allowed_locations = ('s3-bucket-name');
+
+DESC INTEGRATION s3_integration_json;
+
+# Defining the file format which needs to be loaded
+create or replace file format chess.public.json_format
+    type = json;
+
+# Creating an external stage which will point to the bucket where the files are stored.
+create or replace stage chess.public.ext_streamers_json_stage
+    url = 's3-bucket-name'
+    storage_integration = s3_integration_json
+    file_format = chess.public.json_format ;
+    
+    
+list @chess.public.ext_streamers_json_stage;
+
+
+select metadata$filename, metadata$file_row_number, $1 from @chess.public.ext_streamers_json_stage;
+
+# Creating a pipe and configuring the SQS event throught which whenever a new file will arrive in the bucket it will automatically
+# get picked up by the snowpipe and run the copy into command through which the data will be loaded in the raw table.
+
+create or replace pipe chess.public.streamers_pipe auto_ingest=true as 
+copy into streamers_raw_tbl from (select $1 from @chess.public.ext_streamers_json_stage)
+
+show pipes;
+
+select * from streamers_raw_tbl;
+
+# Finally inseting the data into the final table after performing neccessary tranformation using lateral flatten function as the json structure was 
+# contained inside a list
+insert into streamers(is_live,username)
+  select streamers_flat.value['isLive'] as is_live, streamers_flat.value['username']::string as username
+  from 
+  (select streamers_json as json_data 
+   from streamers_raw_tbl) streamers,
+      lateral flatten(input => streamers.json_data) streamers_flat;
+      
+
+select * from streamers;
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 
+create or replace table players_info(
+ row_num_player int autoincrement start 1 increment 1,
+ username string,
+ followers int,
+ country string,
+ joined int,
+ location string,
+ name string,
+ player_id int,
+ status string,
+ title string
+);
+
+create or replace table players_info_raw(
+ players_json variant
+);
+
+create or replace storage integration s3_integration_playerInfo_json
+    type = external_stage
+    storage_provider = s3
+    enabled = true
+    storage_aws_role_arn = 'role'
+    storage_allowed_locations = ('s3-bucket-name');
+    
+desc integration s3_integration_playerInfo_json;
+    
+create or replace stage chess.public.ext_playersInfo_json_stage
+    url = 's3-bucket-name'
+    storage_integration = s3_integration_playerInfo_json
+    file_format = chess.public.json_format ;
+    
+list @chess.public.ext_playersInfo_json_stage;
+
+select $1 from @chess.public.ext_playersInfo_json_stage;
+
+create or replace pipe chess.public.playerInfo_pipe auto_ingest=true as 
+copy into players_info_raw from (select $1 from @chess.public.ext_playersInfo_json_stage)
+
+select * from players_info_raw;
+
+
+insert into players_info (username,followers,country,joined,location,name,player_id,status,title)
+select players_flat.value['username']:: string as username, players_flat.value['followers'] as followers, substring(players_flat.value['country']::string,35,2) 
+                                                                                                                    as country,
+       players_flat.value['joined'] as joined, players_flat.value['location']::string as location, players_flat.value['name']::string as name,
+       players_flat.value['player_id'] as player_id, players_flat.value['status']::string as status, players_flat.value['title']::string as title
+       from
+            (select players_json as json_data 
+             from players_info_raw) playersinfo,
+             lateral flatten(input => playersinfo.json_data) players_flat;
+    
+select * from players_info; #Data is present in the table.
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+create or replace table players_stats(
+ row_number_stats int autoincrement start 1 increment 1,
+ last_blitz int,
+ draw_blitz int,
+ loss_blitz int,
+ win_blitz int,
+ last_bullet int,
+ draw_bullet int,
+ loss_bullet int,
+ win_bullet int, 
+ last_rapid int,
+ draw_rapid int,
+ loss_rapid int, 
+ win_rapid  int,
+ fide int
+);
+
+create or replace table player_stats_raw(
+  player_stats_json variant
+);
+
+create or replace storage integration s3_integration_playerstats_json
+    type = external_stage
+    storage_provider = s3
+    enabled = true
+    storage_aws_role_arn = 'aws-arn-role'
+    storage_allowed_locations = ('s3-bucket-name');
+
+desc integration s3_integration_playerstats_json;
+
+
+create or replace stage chess.public.ext_playersstats_json_stage
+    url = 's3-bucket-name'
+    storage_integration = s3_integration_playerstats_json
+    file_format = chess.public.json_format ;
+
+
+list @chess.public.ext_playersstats_json_stage;
+
+select $1 from @chess.public.ext_playersstats_json_stage;
+
+create or replace pipe chess.public.playerstats_pipe auto_ingest=true as 
+copy into player_stats_raw from (select $1 from @chess.public.ext_playersstats_json_stage)
+
+select * from player_stats_raw;
+
+insert into players_stats(last_blitz,draw_blitz,loss_blitz,win_blitz,last_bullet,draw_bullet,loss_bullet,win_bullet,last_rapid,draw_rapid,loss_rapid,
+                        win_rapid,fide)
+                        select players_stats_flat.value['last_blitz'] as last_blitz, players_stats_flat.value['draw_blitz'] as draw_blitz, 
+                               players_stats_flat.value['loss_blitz'] as loss_blitz, players_stats_flat.value['win_blitz'] as win_blitz,
+                               players_stats_flat.value['last_bullet'] as last_bullet, players_stats_flat.value['draw_bullet'] as draw_bullet,
+                               players_stats_flat.value['loss_bullet'] as loss_bullet, players_stats_flat.value['win_bullet'] as win_bullet,
+                               players_stats_flat.value['last_rapid'] as last_rapid, players_stats_flat.value['draw_rapid'] as draw_rapid,
+                               players_stats_flat.value['loss_rapid'] as loss_rapid, players_stats_flat.value['win_rapid'] as win_rapid,
+                               players_stats_flat.value['FIDE'] as fide
+                               from (
+                                    select player_stats_json as json_data 
+                                     from player_stats_raw) playersstats,
+                                     lateral flatten(input => playersstats.json_data) players_stats_flat;
+
+
+select * from players_stats;
